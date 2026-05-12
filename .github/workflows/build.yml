@@ -57,7 +57,7 @@ jobs:
           rm -f certificate.p12
 
           codesign --force --deep \
-            --sign "Apple Development: Genki Sasaki (87VY9U4C73)" \
+            --sign "Developer ID Application: Genki Sasaki (ML6Y87RH9L)" \
             --options runtime \
             "dist/セミナーコメント集計ツール.app"
           codesign --verify --deep --strict "dist/セミナーコメント集計ツール.app"
@@ -70,6 +70,23 @@ jobs:
             -srcfolder "dist/セミナーコメント集計ツール.app" \
             -ov -format UDZO \
             SeminarCommentSplitter-mac.dmg
+
+      - name: Notarize and staple DMG
+        env:
+          APPLE_ID:          ${{ secrets.APPLE_ID }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+        run: |
+          if [ -z "$APPLE_ID" ]; then
+            echo "⚠️ APPLE_ID not set — skipping notarization"
+            exit 0
+          fi
+          xcrun notarytool submit SeminarCommentSplitter-mac.dmg \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_ID_PASSWORD" \
+            --team-id "ML6Y87RH9L" \
+            --wait
+          xcrun stapler staple SeminarCommentSplitter-mac.dmg
+          echo "✅ Notarized and stapled"
 
       - uses: actions/upload-artifact@v4
         with:
