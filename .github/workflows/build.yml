@@ -1,0 +1,134 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  # ── macOS → .dmg (Intel x86_64 / Apple Silicon via Rosetta 2)
+  build-mac:
+    runs-on: macos-13
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Build .app bundle
+        run: |
+          uv run pyinstaller \
+            --windowed \
+            --name "セミナーコメント集計ツール" \
+            --collect-all customtkinter \
+            --collect-all tkinterdnd2 \
+            --clean --noconfirm \
+            app.py
+
+      - name: Import certificate
+        env:
+          MACOS_CERTIFICATE:     ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
+          KEYCHAIN_PASSWORD:     ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security set-keychain-settings -t 3600 -u build.keychain
+
+          echo "$MACOS_CERTIFICATE" | base64 --decode > certificate.p12
+          security import certificate.p12 -k build.keychain \
+            -P "$MACOS_CERTIFICATE_PWD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s \
+            -k "$KEYCHAIN_PASSWORD" build.keychain
+          rm -f certificate.p12
+
+      - name: Sign app
+        run: |
+          codesign --force --deep \
+            --sign "Apple Development: Genki Sasaki (87VY9U4C73)" \
+            --options runtime \
+            "dist/セミナーコメント集計ツール.app"
+          codesign --verify --deep --strict "dist/セミナーコメント集計ツール.app"
+
+      - name: Create DMG
+        run: |
+          hdiutil create \
+            -volname "セミナーコメント集計ツール" \
+            -srcfolder "dist/セミナーコメント集計ツール.app" \
+            -ov -format UDZO \
+            SeminarCommentSplitter-mac.dmg
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mac
+          path: SeminarCommentSplitter-mac.dmg
+
+  # ── Windows → single .exe
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Build .exe
+        shell: pwsh
+        run: |
+          uv run pyinstaller `
+            --windowed `
+            --onefile `
+            --name SeminarCommentSplitter `
+            --collect-all customtkinter `
+            --collect-all tkinterdnd2 `
+            --clean --noconfirm `
+            app.py
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: dist\SeminarCommentSplitter.exe
+
+  # ── GitHub Release (tag push only)
+  release:
+    needs: [build-mac, build-windows]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: mac
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            SeminarCommentSplitter-mac.dmg
+            SeminarCommentSplitter.exe
+          body: |
+            ## セミナーコメント集計ツール ${{ github.ref_name }}
+
+            ### ダウンロード
+            | ファイル | 対象 |
+            |---------|------|
+            | `SeminarCommentSplitter-mac.dmg` | macOS 12+ (Intel / Apple Silicon via Rosetta 2) |
+            | `SeminarCommentSplitter.exe` | Windows 10/11 |
+
+            ### 初回起動
+            - **Mac**: DMG を開いて `.app` を Applications フォルダへ。初回は右クリック →「開く」
+            - **Windows**: `.exe` を右クリック →「その他の情報」→「実行」（SmartScreen の警告を回避）
