@@ -33,12 +33,17 @@ jobs:
             --clean --noconfirm \
             app.py
 
-      - name: Import certificate
+      - name: Sign app (skip if secrets not configured)
         env:
           MACOS_CERTIFICATE:     ${{ secrets.MACOS_CERTIFICATE }}
           MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
           KEYCHAIN_PASSWORD:     ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
+          if [ -z "$MACOS_CERTIFICATE" ]; then
+            echo "⚠️ MACOS_CERTIFICATE not set — skipping code signing"
+            exit 0
+          fi
+
           security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
           security default-keychain -s build.keychain
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
@@ -51,13 +56,12 @@ jobs:
             -k "$KEYCHAIN_PASSWORD" build.keychain
           rm -f certificate.p12
 
-      - name: Sign app
-        run: |
           codesign --force --deep \
             --sign "Apple Development: Genki Sasaki (87VY9U4C73)" \
             --options runtime \
             "dist/セミナーコメント集計ツール.app"
           codesign --verify --deep --strict "dist/セミナーコメント集計ツール.app"
+          echo "✅ Signed"
 
       - name: Create DMG
         run: |
