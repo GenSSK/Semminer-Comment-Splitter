@@ -10,9 +10,10 @@ permissions:
   contents: write
 
 jobs:
-  # ── macOS → .dmg (Intel x86_64 / Apple Silicon via Rosetta 2)
+  # ── macOS → .dmg
   build-mac:
-    runs-on: macos-13
+    runs-on: macos-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -126,7 +127,7 @@ jobs:
             ### ダウンロード
             | ファイル | 対象 |
             |---------|------|
-            | `SeminarCommentSplitter-mac.dmg` | macOS 12+ (Intel / Apple Silicon via Rosetta 2) |
+            | `SeminarCommentSplitter-mac.dmg` | macOS 12+ (Apple Silicon ネイティブ / Intel は Rosetta 2) |
             | `SeminarCommentSplitter.exe` | Windows 10/11 |
 
             ### 初回起動

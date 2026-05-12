@@ -12,7 +12,7 @@
 
 | ファイル | 対象 |
 |---------|------|
-| `SeminarCommentSplitter-mac.dmg` | macOS 12 以降（Intel / Apple Silicon） |
+| `SeminarCommentSplitter-mac.dmg` | macOS 12 以降（Apple Silicon ネイティブ / Intel は Rosetta 2） |
 | `SeminarCommentSplitter.exe` | Windows 10/11 |
 
 > **Mac 初回起動時**: DMG を開いて `.app` を Applications フォルダへドラッグ。初回のみ右クリック →「開く」→「開く」を選択（Gatekeeper の警告を回避）  
